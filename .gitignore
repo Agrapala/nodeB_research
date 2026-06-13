@@ -1,0 +1,33 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+myenv/
+.venv/
+venv/
+env/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Model and training outputs
+output/
+*.h5
+*.keras
+*.ckpt
+*.tflite
+
