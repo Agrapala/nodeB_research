@@ -1,0 +1,26 @@
+# ============================================================
+#  docker-compose.yml  —  Central PoCL server
+#  Run on the central aggregation server (100.64.0.1)
+#  Usage:  docker compose up -d
+# ============================================================
+version: "3.9"
+
+services:
+
+  # PoCL file-transfer + aggregation server
+  pocl-server:
+    image: ghcr.io/YOUR_GITHUB_USER/pocl-server:latest
+    container_name: pocl-server
+    restart: unless-stopped
+    ports:
+      - "8888:8888"   # model file transfer
+      - "5004:5004"   # monitoring dashboard
+    volumes:
+      - pocl-models:/app/received_models
+      - pocl-aggregated:/app/aggregated
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  pocl-models:
+  pocl-aggregated:
