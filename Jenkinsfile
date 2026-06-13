@@ -4,8 +4,8 @@ pipeline {
     environment {
         NODE_KEY  = "${NODE_KEY}"
         SERVER_IP = "100.64.0.1"
-        VENV_DIR  = "/opt/pocl-venv"
-        HASH_FILE = "/opt/pocl-venv/requirements.hash"
+        VENV_DIR  = "${WORKSPACE}/.venv"
+        HASH_FILE = "${WORKSPACE}/.venv/requirements.hash"
     }
 
     triggers { githubPush() }
@@ -51,7 +51,7 @@ pipeline {
                         echo "Installing dependencies..."
                         $VENV_DIR/bin/pip install -r requirements.txt
 
-                        mkdir -p /opt/pocl-venv
+                        mkdir -p $VENV_DIR
                         echo "$CURRENT_HASH" > $HASH_FILE
                     else
                         echo "No dependency changes detected. Skipping install."
