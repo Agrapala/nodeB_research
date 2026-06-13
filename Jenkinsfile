@@ -39,7 +39,10 @@ pipeline {
                 anyOf {
                     changeset "requirements.txt"
                     changeset "Dockerfile"
-                    not { sh(script: "docker image inspect ${IMAGE} > /dev/null 2>&1", returnStatus: true) == 0 }
+                    expression {
+                        // ✅ sh() is allowed inside expression { }
+                        return sh(script: "docker image inspect ${IMAGE} > /dev/null 2>&1", returnStatus: true) != 0
+                    }
                 }
             }
             steps {
