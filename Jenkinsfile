@@ -2,9 +2,10 @@ pipeline {
     agent any
 
     environment {
-        NODE_KEY   = "${NODE_KEY}"    // set per laptop in Jenkins globals
-        SERVER_IP  = "100.64.0.1"
-        VENV_DIR   = "/opt/pocl-venv" // outside workspace — survives builds
+        NODE_KEY  = "${NODE_KEY}"
+        SERVER_IP = "100.64.0.1"
+        VENV_DIR  = "/opt/pocl-venv"
+        HASH_FILE = "/opt/pocl-venv/requirements.hash"
     }
 
     triggers { githubPush() }
@@ -12,21 +13,49 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
-        stage('Install deps') {
-            // Only runs when requirements.txt actually changes
-            when {
-                anyOf {
-                    changeset "requirements.txt"
-                    not { fileExists("/opt/pocl-venv/bin/activate") }
+        stage('Detect requirements change') {
+            steps {
+                script {
+                    def currentHash = sh(
+                        script: "sha256sum requirements.txt | awk '{print \$1}'",
+                        returnStdout: true
+                    ).trim()
+
+                    def oldHash = ""
+                    if (fileExists(env.HASH_FILE)) {
+                        oldHash = readFile(env.HASH_FILE).trim()
+                    }
+
+                    env.REQS_CHANGED = (currentHash != oldHash).toString()
+                    env.CURRENT_HASH = currentHash
+
+                    echo "Requirements changed: ${env.REQS_CHANGED}"
                 }
             }
+        }
+
+        stage('Setup venv + install deps') {
             steps {
                 sh '''
-                    python3 -m venv /opt/pocl-venv
-                    /opt/pocl-venv/bin/pip install -r requirements.txt
+                    if [ ! -d "$VENV_DIR" ]; then
+                        echo "Creating virtualenv..."
+                        python3 -m venv "$VENV_DIR"
+                    fi
+
+                    if [ "$REQS_CHANGED" = "true" ]; then
+                        echo "Installing dependencies..."
+                        $VENV_DIR/bin/pip install -r requirements.txt
+
+                        mkdir -p /opt/pocl-venv
+                        echo "$CURRENT_HASH" > $HASH_FILE
+                    else
+                        echo "No dependency changes detected. Skipping install."
+                    fi
                 '''
             }
         }
@@ -34,7 +63,7 @@ pipeline {
         stage('Train') {
             steps {
                 sh '''
-                    /opt/pocl-venv/bin/python hospital_node_client.py \
+                    $VENV_DIR/bin/python hospital_node_client.py \
                         --node ${NODE_KEY} --train_only --epochs 10
                 '''
             }
@@ -44,8 +73,9 @@ pipeline {
             steps {
                 script {
                     def meta = readJSON file: 'output/metadata.json'
-                    if ((meta.val_accuracy as Float) < 0.75)
+                    if ((meta.val_accuracy as Float) < 0.75) {
                         error("Accuracy too low: ${meta.val_accuracy}")
+                    }
                     echo "Accuracy: ${meta.val_accuracy} ✔"
                 }
             }
@@ -54,7 +84,7 @@ pipeline {
         stage('Send to server') {
             steps {
                 sh '''
-                    /opt/pocl-venv/bin/python hospital_node_client.py \
+                    $VENV_DIR/bin/python hospital_node_client.py \
                         --node ${NODE_KEY} --server_ip ${SERVER_IP} --send_only
                 '''
             }
